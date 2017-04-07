@@ -6,10 +6,6 @@
 */
 package valuesauce;
 
-import java.awt.BorderLayout;
-import java.awt.event.WindowAdapter;
-import java.awt.event.WindowEvent;
-import java.awt.event.WindowListener;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -17,17 +13,21 @@ import java.util.Properties;
 import java.util.logging.FileHandler;
 import java.util.logging.Level;
 import solidtea.Solidtea;
+import solidtea.DatabaseEngine;
+import solidtea.objects.DBConnection;
 
 import java.util.logging.Logger;
-import javax.swing.JOptionPane;
 
 /**
  *
  * @author snr
  */
 public class Valuesauce implements Solidtea { 
-    private final String _class;
-    private Logger myLogger;
+    private final String _CLASS;
+    private Properties _psProps, _sysProps;
+    private DatabaseEngine _dEngine;
+    
+    DBConnection dbcon;
     
     
     /**
@@ -35,58 +35,53 @@ public class Valuesauce implements Solidtea {
      */
     public static void main(String[] args) {
         // TODO code application logic here
+        Valuesauce vs = new Valuesauce("settings.properties", "v6macassoc/preparedstatements.properties");
     }
     
-    public Valuesauce() {
-        this._class = this.getClass().getName();
-    }
-    
-    private void initComponents() {
-        System.out.println(_class+"/initComponents - entered");
+    public Valuesauce(String propsStr, String psRBStr) {
+        this._CLASS = this.getClass().getName();
+        
+        Runtime.getRuntime().addShutdownHook(new ShutdownThread(this));
+        
         try {
-            sysProps = this.loadPropsFromFile(propsStr, true);
-            psProps = this.loadPropsFromFile(psRBStr, false); 
-
-            if(sysProps != null) {
-                myLogger.addHandler(new FileHandler("%t/"+myLogger.getName()));
-                dbCon2 = new dbConnection2(this, sysProps);
-                
-                this.setSize(Integer.parseInt(getSysProperty("sizeX")), Integer.parseInt(getSysProperty("sizeY")));
-                this.createdbConnection(getSysProperty("jdbc.server"), getSysProperty("jdbc.username"), getSysProperty("jdbc.password"));
-                if(getSysProperty("jdbcApp.displayExceptions").equals("true") )
-                    this.displayExceptions = true;
-                
-                //myLogger.addHandler(new FileHandler("%t/"+myLogger.getName()));
-                
-                //dbCon2 = new dbConnection2(this, sysProps);
-            } else {
-                log(Level.INFO, _class, "initComponents", "system props not loaded, so using defaults.");
-            }
+            _sysProps = this.loadPropsFromFile(settingsTxt, true);
+            _psProps =  this.loadPropsFromFile(psTxt, false);
+            
             //assignSystemVariables();
-        } catch (IOException ioe) { System.out.println(ioe); }
-
-
-        content = this.getContentPane();
-        content.setLayout(new BorderLayout(2, 2));
-
-        sBar = new statusBar(this);
-        sBar.setSize(0,10);
-
-        content.add(sBar, BorderLayout.SOUTH);
-
-        WindowListener l = new WindowAdapter() {
-            @Override public void windowClosing(WindowEvent e) {
-                closeApp();
+            createDBConnection(this.getSysProperty("sql_server_ip_addr"), this.getSysProperty("sql_server_username"), this.getSysProperty("sql_server_password"));
+            
+            _dEngine = new DatabaseEngine(this, dbcon);
+            
+            this.runAsDaemon(30);
+            
+        } catch (IOException ioe) { System.out.println(_CLASS+"/"+ioe); }
+        
+    }
+    
+    private void runAsDaemon(int interval) {
+        while(true) {
+            _dEngine.execute();
+            try {
+                Thread.sleep(interval);
+            } catch(InterruptedException ie) {
+                System.out.println(_CLASS+"/runAsDaemon - exception");
+                ie.printStackTrace();
             }
-        };
-        this.addWindowListener(l);
+        }
+    }
+    
+    public void shutdownThreads() {
+        System.out.println(_CLASS+"/shutdownThreads - starting");
+        _dEngine.shutdown();
+    }
+    
+    private void createDBConnection(String ip, String u, String p) {
+        dbcon = new DBConnection(ip, u, p, _psProps);
     }
     
     
-
-    @Override
-    public Properties loadPropsFromFile(String p1, boolean external) {
-        log(Level.INFO, _class, "loadPropsFromFile", "Attempting to load "+p1);
+    private Properties loadPropsFromFile(String p1, boolean external) {
+        System.out.println(_CLASS+"/loadPropsFromFile - attempting to load "+p1);
         Properties tmp_prop = new java.util.Properties();
         InputStream in = null;
 
@@ -97,15 +92,32 @@ public class Valuesauce implements Solidtea {
                 in = this.getClass().getClassLoader().getResourceAsStream(p1);
                 
             if (in == null) {
-                log(Level.INFO, _class, "loadPropsFromFile", p1+" not found!!!");
+                System.out.println(_CLASS+"/loadPropsFromFile - "+p1+ " not found!!!");
                 tmp_prop = null;
             } else {
                 tmp_prop.load(in);
             }
-        } catch(IOException ioe) { log(Level.SEVERE, _class, "loadPropsFromFile", ioe); }
+        } catch(IOException ioe) { System.out.println(_CLASS+"/loadPropsFromFile - "+ioe); }
 
         return tmp_prop;
     }
+
+    public String getSysProperty(String arg) throws IOException {
+        System.out.println(_CLASS+"/getSysProperty - "+arg);
+        String s;
+        if(_sysProps==null) {
+            throw new IOException(_CLASS+"/getSysProperty - Props file not loaded!");
+        } else {
+            s = _sysProps.getProperty(arg);
+            if(s==null)
+                throw new IOException(_CLASS+"/getSysProperty - Null value. Does field exist??");
+            
+            System.out.println(_CLASS+"/getSysProperty - value is "+s);
+            return s;
+        }
+    }
+    
+    public Object saveSysProperty(String key, String value) { return _sysProps.setProperty(key, value); }
 
     @Override
     public void log(Level level, String sourceClass, String sourceMethod, String message) {
@@ -137,9 +149,6 @@ public class Valuesauce implements Solidtea {
         } else {
             myLogger.logp(level, sourceClass, sourceMethod, e.toString());
         }
-        
-        if(displayExceptions)
-            JOptionPane.showMessageDialog(null, sourceClass+"/"+sourceMethod+"\n"+e.toString(), "Exception", JOptionPane.ERROR_MESSAGE);
     }
     
 }
