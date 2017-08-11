@@ -12,23 +12,27 @@ import java.io.InputStream;
 import java.util.Properties;
 import java.util.logging.FileHandler;
 import java.util.logging.Level;
-import solidtea.Solidtea;
-import solidtea.DatabaseEngine;
-import solidtea.objects.DBConnection;
+
+
+
+//import solidtea.Solidtea;
+//import solidtea.DatabaseEngine;
+//import solidtea.objects.DBConnection;
 
 import java.util.logging.Logger;
+import sleetlocust.objects.SocketEngine;
 
 /**
  *
  * @author snr
  */
-public class Valuesauce implements Solidtea { 
+public class Valuesauce { 
     private final String _CLASS;
     private Properties _psProps, _sysProps;
-    private DatabaseEngine _dEngine;
     
-    DBConnection dbcon;
+    private final SocketEngine _sslengine;
     
+    private static Logger myLogger = Logger.getLogger("MY.CUSTOM.LOGGER");
     
     /**
      * @param args the command line arguments
@@ -41,26 +45,29 @@ public class Valuesauce implements Solidtea {
     public Valuesauce(String propsStr, String psRBStr) {
         this._CLASS = this.getClass().getName();
         
-        Runtime.getRuntime().addShutdownHook(new ShutdownThread(this));
+        //Runtime.getRuntime().addShutdownHook(new ShutdownThread(this));
         
-        try {
-            _sysProps = this.loadPropsFromFile(settingsTxt, true);
-            _psProps =  this.loadPropsFromFile(psTxt, false);
+        //try {
+            _sysProps = this.loadPropsFromFile(propsStr, true);
+            _psProps =  this.loadPropsFromFile(psRBStr, false);
+            
+            this._sslengine = new SocketEngine(SocketEngine.SSL, 44005);
+            this._sslengine.execute();
             
             //assignSystemVariables();
-            createDBConnection(this.getSysProperty("sql_server_ip_addr"), this.getSysProperty("sql_server_username"), this.getSysProperty("sql_server_password"));
+            //createDBConnection(this.getSysProperty("sql_server_ip_addr"), this.getSysProperty("sql_server_username"), this.getSysProperty("sql_server_password"));
             
-            _dEngine = new DatabaseEngine(this, dbcon);
+            //_dEngine = new DatabaseEngine(this, dbcon);
             
             this.runAsDaemon(30);
             
-        } catch (IOException ioe) { System.out.println(_CLASS+"/"+ioe); }
+        //} catch (IOException ioe) { System.out.println(_CLASS+"/"+ioe); }
         
     }
     
     private void runAsDaemon(int interval) {
         while(true) {
-            _dEngine.execute();
+            //_dEngine.execute();
             try {
                 Thread.sleep(interval);
             } catch(InterruptedException ie) {
@@ -72,12 +79,12 @@ public class Valuesauce implements Solidtea {
     
     public void shutdownThreads() {
         System.out.println(_CLASS+"/shutdownThreads - starting");
-        _dEngine.shutdown();
+        //_dEngine.shutdown();
     }
     
-    private void createDBConnection(String ip, String u, String p) {
+    /*private void createDBConnection(String ip, String u, String p) {
         dbcon = new DBConnection(ip, u, p, _psProps);
-    }
+    }*/
     
     
     private Properties loadPropsFromFile(String p1, boolean external) {
@@ -118,13 +125,11 @@ public class Valuesauce implements Solidtea {
     }
     
     public Object saveSysProperty(String key, String value) { return _sysProps.setProperty(key, value); }
-
-    @Override
+    
     public void log(Level level, String sourceClass, String sourceMethod, String message) {
         myLogger.logp(level, sourceClass, sourceMethod, message);
     }
 
-    @Override
     public void log(Level level, String sourceClass, String sourceMethod, Exception e) {
         this.exceptionEncountered(level, sourceClass, sourceMethod, e);
     }
@@ -142,7 +147,7 @@ public class Valuesauce implements Solidtea {
              java.sql.SQLException sqle = (java.sql.SQLException)e;
              String message = "SQLException: " + sqle.getMessage() +" /n"+"SQLState: " + sqle.getSQLState()+" /n"+"VendorError: " + sqle.getErrorCode();
              
-             myLogger.logp(level, sourceClass, sourceMethod, message);
+            myLogger.logp(level, sourceClass, sourceMethod, message);
         } else if(e instanceof java.io.IOException) {
             java.io.IOException ioe = (java.io.IOException)e;
             myLogger.logp(level, sourceClass, sourceMethod, ioe.getMessage());
