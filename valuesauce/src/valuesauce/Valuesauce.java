@@ -9,6 +9,7 @@ package valuesauce;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.security.KeyStore;
 import java.util.Properties;
 import java.util.logging.FileHandler;
 import java.util.logging.Level;
@@ -20,6 +21,7 @@ import java.util.logging.Level;
 //import solidtea.objects.DBConnection;
 
 import java.util.logging.Logger;
+import javax.net.ssl.KeyManagerFactory;
 import sleetlocust.objects.SocketEngine;
 
 /**
@@ -39,10 +41,10 @@ public class Valuesauce {
      */
     public static void main(String[] args) {
         // TODO code application logic here
-        Valuesauce vs = new Valuesauce("settings.properties", "v6macassoc/preparedstatements.properties");
+        Valuesauce vs = new Valuesauce("settings.properties", "v6macassoc/preparedstatements.properties", args[0], args[1], args[2]);
     }
     
-    public Valuesauce(String propsStr, String psRBStr) {
+    public Valuesauce(String propsStr, String psRBStr, String keystoreName, String ksPassword, String keyPassword) {
         this._CLASS = this.getClass().getName();
         
         //Runtime.getRuntime().addShutdownHook(new ShutdownThread(this));
@@ -51,7 +53,16 @@ public class Valuesauce {
             _sysProps = this.loadPropsFromFile(propsStr, true);
             _psProps =  this.loadPropsFromFile(psRBStr, false);
             
-            this._sslengine = new SocketEngine(SocketEngine.SSL, 44005);
+            KeyManagerFactory kmf = null;
+            
+            try {
+                kmf = genKMFactory("JKS", keystoreName, ksPassword, keyPassword);
+            } catch(java.lang.Exception e) { 
+                System.out.println(_CLASS+"/Valuesauce - "+e);
+                System.exit(0);
+            }
+            
+            this._sslengine = new SocketEngine(SocketEngine.SSL, 44005, kmf.getKeyManagers());
             this._sslengine.execute();
             
             //assignSystemVariables();
@@ -85,6 +96,17 @@ public class Valuesauce {
     /*private void createDBConnection(String ip, String u, String p) {
         dbcon = new DBConnection(ip, u, p, _psProps);
     }*/
+    
+    
+    private KeyManagerFactory genKMFactory(String ksType, String ksName, String ksPassword, String keyPassword) throws java.lang.Exception {
+        KeyStore ks = KeyStore.getInstance(ksType);
+        
+        ks.load(new java.io.FileInputStream(ksName), ksPassword.toCharArray());
+        KeyManagerFactory kmf = KeyManagerFactory.getInstance("SunX509");
+        kmf.init(ks, keyPassword.toCharArray());
+        
+        return kmf;
+    }
     
     
     private Properties loadPropsFromFile(String p1, boolean external) {
