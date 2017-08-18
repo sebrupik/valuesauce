@@ -25,6 +25,20 @@ import javax.net.ssl.KeyManagerFactory;
 import sleetlocust.objects.SocketEngine;
 
 /**
+ * Create the keystore:
+ *   keytool -keystore valuesauce.jks -genkey
+ * 
+ * Export the public key:
+ *   keytool -exportcert -file valuesauce_public.crt -keystore valuesauce.jks -storepass <keystore_password>
+ * 
+ *  Import public key into new keystore:
+ *   keytool -importcert -file valuesauce_public.crt -keystore valuesauce_public.jks -storepass <keystore_password>
+ *   
+ *  Running valuesauce:
+ *    java -jar dist/valuesauce.jar ~/valuesauce.jks <keytore_password> <key_password>
+ * 
+ *  Running sleetlocust:
+ *    java -Djavax.net.ssl.trustStore=valuesauce_public.jks -jar dist/sleetlocust.jar
  *
  * @author snr
  */
